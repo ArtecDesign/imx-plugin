@@ -30,3 +30,11 @@ Usage:
  * usb: upload using imx_usb_loader
 
 This plugin has been so far tested only with iMX6Q SoC.
+
+# Running memory calibration/test #
+The plugin can be used with Freescale ddr_stress_tester to calibrate the DDR or to verify the configuration. This way we avoid the duplicate work of generating .inc files for the tool. To do that, you need to add imx header to the ddr_stress_tester. A header for ddr_stress_tester v2.52 is provided in this repository.
+This is needed because the imx6 serial upload protocol can't directly jump to an address, the JUMP_ADDRESS command needs to point to an imx header, where the real jump address is.
+
+Usage:
+ * cat plugin.imx memtest_header.bin ddr-test-uboot-jtag-mx6dq.bin > memtest.imx
+ * imx_usb memtest.imx
