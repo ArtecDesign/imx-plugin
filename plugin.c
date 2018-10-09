@@ -13,6 +13,7 @@
 
 #include "serial.h"
 #include "board.h"
+#include "config.h"
 
 /* iMX boot ROM looks for iMX header at this offset */
 #define FLASH_OFFSET				0x400
@@ -97,9 +98,11 @@ typedef enum hab_status (*hab_rvt_entry_t)(void);
 typedef void (*hab_failsafe_t)(void);
 
 enum IMX_ROM_TYPE {
+	IMX_ROM_UNIFIED,
+#if CFG_PLATFORM == PLATFORM_IMX6
 	IMX_ROM_LEGACY,
 	IMX_ROM_DQL_NEW,	/* MX6DQ >= TO1.5; MX6DL >= TO1.2; MX6DQP */
-	IMX_ROM_SX,
+#endif
 	NUM_IMX_ROM_TYPES
 };
 
@@ -116,6 +119,12 @@ struct imx_rom_ptrs {
 };
 
 struct imx_rom_ptrs imx_rom_ptrs[NUM_IMX_ROM_TYPES] = {
+	[IMX_ROM_UNIFIED] = {
+		.pu_irom_hwcnfg_setup = (pu_irom_hwcnfg_setup_t*)(0x00000180 + 0x08),
+		.hab_rvt_entry = (hab_rvt_entry_t*)(0x00000100 + 0x04),
+		.hab_failsafe_t = (hab_failsafe_t*)(0x00000100 + 0x28),
+	},
+#if CFG_PLATFORM == PLATFORM_IMX6
 	[IMX_ROM_LEGACY] = {
 		.pu_irom_hwcnfg_setup = (pu_irom_hwcnfg_setup_t*)(0x000000C0 + 0x08),
 		.hab_rvt_entry = (hab_rvt_entry_t*)(0x00000094 + 0x04),
@@ -126,15 +135,14 @@ struct imx_rom_ptrs imx_rom_ptrs[NUM_IMX_ROM_TYPES] = {
 		.hab_rvt_entry = (hab_rvt_entry_t*)(0x00000098 + 0x04),
 		.hab_failsafe_t = (hab_failsafe_t*)(0x00000098 + 0x28),
 	},
-	[IMX_ROM_SX] = {
-		.pu_irom_hwcnfg_setup = (pu_irom_hwcnfg_setup_t*)(0x00000180 + 0x08),
-		.hab_rvt_entry = (hab_rvt_entry_t*)(0x00000100 + 0x04),
-		.hab_failsafe_t = (hab_failsafe_t*)(0x00000100 + 0x28),
-	}
+#endif
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 static enum IMX_ROM_TYPE get_rom_type() {
+#if CFG_PLATFORM == PLATFORM_IMX7
+	return IMX_ROM_UNIFIED;
+#elif CFG_PLATFORM == PLATFORM_IMX6
 	/* The "Chip Silicon Version" register is at USB analog PHY address space!
 	 * Even this register is at different locations, we need to find it. */
 	#define REG_ANATOP_DIGPROG		0x020C8260
@@ -146,7 +154,7 @@ static enum IMX_ROM_TYPE get_rom_type() {
 
 	type = (__REG(REG_ANATOP_DIGPROG) >> 16) & 0xFF;
 	/* iMX6SX? (solo x) */
-	if (type == 0x62) return IMX_ROM_SX;
+	if (type == 0x62) return IMX_ROM_UNIFIED;
 	/* iMX6DQ / iMXDQP (dual / quad / dual plus / quad plus) */
 	if (type == 0x63) {
 		uint32_t ver = __REG(REG_ANATOP_DIGPROG) & 0xFFFF;
@@ -164,6 +172,7 @@ static enum IMX_ROM_TYPE get_rom_type() {
 		return IMX_ROM_LEGACY;
 	}
 	return IMX_ROM_LEGACY;
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -203,8 +212,10 @@ static int plugin_load_data(void **start, uint32_t *bytes, uint32_t *ivt_offset)
 	struct imx_rom_ptrs *rom = &imx_rom_ptrs[get_rom_type()];
 	(*rom->pu_irom_hwcnfg_setup)(&loaded_start, &loaded_size, &boot);
 
+#if CFG_PLATFORM == PLATFORM_IMX6
 	/* pu_irom_hwcnfg_setup forgets the L2 cache to enabled. Disable it. */
 	__REG(0x00A02100) = 0;
+#endif
 
 	/* verify the image we got */
 	struct flash_header *h2 = (struct flash_header *)(loaded_start + FLASH_OFFSET);
@@ -233,7 +244,7 @@ int plugin_download(void **start, uint32_t *bytes, uint32_t *ivt_offset) {
 	board_early_init_hw();
 
 	dbg_init();
-	dbg_str("\n\niMX6 boot plugin, version " __stringify(VERSION) "\n");
+	dbg_str("\n\niMX boot plugin, version " __stringify(VERSION) "\n");
 
 	if (board_init_hw() != 0) {
 		return 0;

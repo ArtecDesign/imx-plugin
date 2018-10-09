@@ -1,6 +1,6 @@
 
 CROSS := arm-linux-gnueabihf2014.09-
-SW_VER_STRING := 0.0.1
+SW_VER_STRING := 0.0.2
 
 CC:=$(CROSS)gcc
 LD:=$(CROSS)gcc

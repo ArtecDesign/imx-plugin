@@ -13,16 +13,32 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "config.h"
+
 #define __REG(x)     (*((volatile uint32_t *)(x)))
 
 #define UART_BAUD			115200
-#define UART_CLOCK			80000000
 
+#if CFG_PLATFORM == PLATFORM_IMX6
+#define UART_CLOCK			80000000
+#define UART_PHYS			(0x02020000)
+#elif CFG_PLATFORM == PLATFORM_IMX7
+#define UART_CLOCK			24000000
+#define UART_PHYS			(0x30860000)
+#endif
+
+#if CFG_PLATFORM == PLATFORM_IMX7
+#define CCM_TARGET_ROOT_UART1	__REG(0x3038af80)
+#define CCM_CCGR_UART1			__REG(0x30384940)
+#define SW_MUX_CTL_PAD_UART1_RX_DATA	__REG(0x30330128)
+#define SW_MUX_CTL_PAD_UART1_TX_DATA	__REG(0x3033012c)
+#endif
+
+#if CFG_PLATFORM == PLATFORM_IMX6
 #define IOMUXC_SW_MUX_CTL_PAD_CSI0_DATA10	__REG(0x20E0280)
 #define IOMUXC_SW_MUX_CTL_PAD_CSI0_DATA11	__REG(0x20E0284)
 #define IOMUXC_UART1_IPP_UART_RXD_MUX_SELECT_INPUT	__REG(0x20E0920)
-
-#define UART_PHYS			(0x02020000)
+#endif
 
 #define UART_UTXD			__REG(UART_PHYS + 0x40)
 #define UART_UCR1			__REG(UART_PHYS + 0x80)
@@ -45,7 +61,7 @@
 #define UCR2_TXEN			(1<<2)
 #define UCR2_RXEN			(1<<1)
 #define UCR2_SRST			(1<<0)
-#define UCR3_RXDMUXSEL		(1<<4)
+#define UCR3_RXDMUXSEL		(1<<2)
 #define UCR3_ADNIMP			(1<<7)
 #define UTS_TXEMPTY			(1<<6)
 #define UFCR_RXTL_OFFS		0
@@ -59,16 +75,26 @@
 ///////////////////////////////////////////////////////////////////////////////
 void dbg_init(void)
 {
+#if CFG_PLATFORM == PLATFORM_IMX6
 	IOMUXC_SW_MUX_CTL_PAD_CSI0_DATA10 = 0x03;
 	IOMUXC_SW_MUX_CTL_PAD_CSI0_DATA11 = 0x03;
 	IOMUXC_UART1_IPP_UART_RXD_MUX_SELECT_INPUT = 0x01;
+#endif
 
+#if CFG_PLATFORM == PLATFORM_IMX7
+	SW_MUX_CTL_PAD_UART1_RX_DATA = 0x0;
+	SW_MUX_CTL_PAD_UART1_TX_DATA = 0x0;
+	CCM_CCGR_UART1 = 0;
+	CCM_TARGET_ROOT_UART1 = 0x10000000;
+	CCM_CCGR_UART1 = 3;
+#endif
 
 	UART_UCR1 = 0x0; /* Disable */
 	UART_UCR2 = 0x0; /* SWRST */
 	while (!(UART_UCR2 & UCR2_SRST));
 
 	UART_UCR3 |= UCR3_RXDMUXSEL | UCR3_ADNIMP;
+
 	UART_UFCR = (RFDIV << UFCR_RFDIV_OFFS)
 		| (TXTL << UFCR_TXTL_OFFS)
 		| (RXTL << UFCR_RXTL_OFFS);
