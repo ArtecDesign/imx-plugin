@@ -2,7 +2,9 @@ ENTRY(plugin_download)
 
 MEMORY
 {
-  RAM (rwx)       : ORIGIN = 0x00910000, LENGTH = 64K
+  /* Although according to RM the bootloader does not use memory above 0x910000,
+   * it actually has a buffer there. Keep away from it. */
+  RAM (rwx)       : ORIGIN = 0x00918000, LENGTH = 32K
 }
 
 SECTIONS
@@ -27,7 +29,7 @@ SECTIONS
     *(.rodata*)
   } >RAM
 
-  .data : 
+  .data :
   {
     . = ALIGN(4);
     *(.data)
@@ -41,14 +43,15 @@ SECTIONS
     *(.bss*)
   } >RAM
 
-  /* The size of plugin must be aligned to 512 bytes or the loader will corrupt data! */
+  /* The size of plugin must be aligned to 512 bytes or the SD loader will
+   * corrupt data! */
   .align :
   {
 	. = ALIGN(512);
 	. += 511;
 	BYTE(0x00);
   } >RAM
-  
+
   _plugin_end = .;
   _plugin_size = _plugin_end - _plugin_start;
 }

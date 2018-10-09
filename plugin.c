@@ -77,7 +77,8 @@ __attribute__ ((used, section(".flash_header")))
 		.start = (&_plugin_start) - FLASH_OFFSET,
 		/* Load extra 512 bytes to include the uboot flash header, which must be
 		 * concatenated after this plugin image.
-		 * Keep the size multiple of 512 bytes or the ROM will mess up the data! */
+		 * Keep the size multiple of 512 bytes or the iMX6 SD loader will mess
+		 * up the data! (iMX7 NAND loader does not have this problem) */
 		.size = (uint32_t)(&_plugin_size) + FLASH_OFFSET + 512,
 		.plugin = 1,
 	},
@@ -196,8 +197,8 @@ static int plugin_load_data(void **start, uint32_t *bytes, uint32_t *ivt_offset)
 	/* Ask the ROM to load the bootloader to memory.
 	 * ROM reads always starting from flash beginning!
 	 * Actually, it copies over the data it has already loaded from
-	 * SRAM and then appends it as much as needed.
-	 * If the previous load was not multiple of MMC block size,
+	 * SRAM buffer and then appends it as much as needed.
+	 * iMX6 MMC: If the previous load was not multiple of MMC block size,
 	 * the beginning of this will get corrupted! */
 	struct imx_rom_ptrs *rom = &imx_rom_ptrs[get_rom_type()];
 	(*rom->pu_irom_hwcnfg_setup)(&loaded_start, &loaded_size, &boot);
